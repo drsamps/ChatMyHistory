@@ -1,35 +1,37 @@
 {% extends "base.html" %}
 {% block title %}Interview · Chat My History{% endblock %}
 {% block content %}
-  <div class="sticky top-0 z-40 bg-gray-50/95 supports-[backdrop-filter]:bg-gray-50/80 backdrop-blur border-b py-2 mb-3 flex items-center justify-between gap-2">
+  <div class="mb-1 flex items-center gap-2">
+    <label class="text-sm flex items-center gap-2">
+      <span>Interviewer:</span>
+      <select id="personaSelect" class="border rounded p-1 text-sm min-w-[16rem]" title="Select an interviewer persona...">
+        <option value="">Select an interviewer persona...</option>
+        {% if personas and personas|length > 0 %}
+          {% for p in personas %}
+            <option value="{{ p.id }}" {% if selected_persona_id and p.id == selected_persona_id %}selected{% endif %}>{{ p.name }}{% if p.is_system %} (system){% endif %}</option>
+          {% endfor %}
+        {% else %}
+          <option disabled>(click Styles to define personalities)</option>
+        {% endif %}
+      </select>
+    </label>
+    {% if summary %}
+      <a href="/interview/{{ interview.id }}/summary" class="px-3 py-2 border rounded text-sm bg-white">View Summary</a>
+    {% endif %}
+    <form id="summarizeForm" method="post" action="/interview/{{ interview.id }}/summarize">
+      <button id="summarizeBtn" class="px-3 py-2 bg-black text-white rounded text-sm hover:bg-gray-800 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-black/50 disabled:opacity-50 disabled:cursor-not-allowed" type="submit">Generate/Refresh Summary</button>
+    </form>
+  </div>
+  <div class="sticky top-0 z-40 bg-gray-50/95 supports-[backdrop-filter]:bg-gray-50/80 backdrop-blur border-b py-2 mb-3">
     <div class="flex items-center gap-2">
+      <span class="text-xl leading-tight font-extrabold tracking-tight">Topic:</span>
       <h1 id="topicTitleDisplay" class="text-xl leading-tight font-extrabold tracking-tight">{{ interview.title }}</h1>
-      <button id="editTitleBtn" type="button" class="text-sm px-2 py-1 border rounded bg-white hover:bg-gray-50" aria-label="Edit topic title">✏️ Edit</button>
+      <button id="editTitleBtn" type="button" class="text-sm px-2 py-1 border rounded bg-white hover:bg-gray-50" aria-label="Rename topic title">Rename</button>
+      <a href="/interview/" class="text-sm px-2 py-1 border rounded bg-white hover:bg-gray-50">Done or New Topic</a>
       <form id="editTitleForm" method="post" action="/interview/{{ interview.id }}/rename" class="hidden items-center gap-2">
         <input id="editTitleInput" name="title" value="{{ interview.title }}" class="border rounded p-1 text-sm min-w-[16rem]" aria-label="Topic title">
         <button class="px-2 py-1 bg-black text-white rounded text-sm" type="submit">Save</button>
         <button id="cancelTitleBtn" class="px-2 py-1 border rounded text-sm bg-white" type="button">Cancel</button>
-      </form>
-    </div>
-    <div class="flex items-center gap-2">
-      <label class="text-sm flex items-center gap-2">
-        <span>Persona</span>
-        <select id="personaSelect" class="border rounded p-1 text-sm min-w-[16rem]" title="Select an interviewer persona...">
-          <option value="">Select an interviewer persona...</option>
-          {% if personas and personas|length > 0 %}
-            {% for p in personas %}
-              <option value="{{ p.id }}" {% if selected_persona_id and p.id == selected_persona_id %}selected{% endif %}>{{ p.name }}{% if p.is_system %} (system){% endif %}</option>
-            {% endfor %}
-          {% else %}
-            <option disabled>(click Styles to define personalities)</option>
-          {% endif %}
-        </select>
-      </label>
-      {% if summary %}
-        <a href="/interview/{{ interview.id }}/summary" class="px-3 py-2 border rounded text-sm bg-white">View Summary</a>
-      {% endif %}
-      <form id="summarizeForm" method="post" action="/interview/{{ interview.id }}/summarize">
-        <button id="summarizeBtn" class="px-3 py-2 bg-black text-white rounded text-sm hover:bg-gray-800 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-black/50 disabled:opacity-50 disabled:cursor-not-allowed" type="submit">Generate/Refresh Summary</button>
       </form>
     </div>
   </div>
@@ -63,30 +65,30 @@
         <button id="micStopSend" type="button" class="px-4 py-2 rounded text-sm font-semibold bg-green-500 hover:bg-green-600 text-white border border-green-600 shadow hidden">Stop Dictation and Send to the Interviewer</button>
         <span id="micStatus" class="text-sm text-gray-500"></span>
       </div>
+      <div class="flex items-center gap-2">
+        <button class="px-5 py-3 bg-black text-white rounded text-lg" type="submit">Send my response</button>
+        <button id="pivotWithinTopicBtn" type="button" class="px-4 py-2 rounded text-sm font-semibold bg-yellow-400 hover:bg-yellow-500 text-black border border-yellow-500 shadow focus:outline-none focus:ring-2 focus:ring-yellow-500/50">Pivot within this topic</button>
+        <a href="/interview/" class="px-4 py-2 rounded text-sm font-semibold bg-white border hover:bg-gray-50">Let's talk about a different topic</a>
+      </div>
       <div class="flex items-center gap-3">
         <label class="inline-flex items-center gap-2 text-sm">
           <input id="ttsToggle" type="checkbox" class="h-4 w-4">
           <span>Speak interview questions</span>
         </label>
         <button id="ttsStop" type="button" class="px-2 py-1 border rounded text-xs">Stop</button>
-        <span id="ttsStatus" class="text-sm text-gray-500"></span>
-      </div>
-      <div class="flex items-center gap-3">
         <label class="text-sm flex items-center gap-2">
-          <span>Voice</span>
+          <span>Interviewer voice:</span>
           <select id="ttsVoice" class="border rounded p-1 text-sm min-w-[12rem]"></select>
         </label>
+        <span id="ttsStatus" class="text-sm text-gray-500"></span>
       </div>
-      <button class="px-5 py-3 bg-black text-white rounded text-lg self-start" type="submit">Send</button>
+      
     </form>
-    <div class="mt-2 flex gap-2">
-      <form method="post" action="/interview/{{ interview.id }}/change-topic">
-        <button class="px-4 py-2 rounded text-sm font-semibold bg-yellow-400 hover:bg-yellow-500 text-black border border-yellow-500 shadow focus:outline-none focus:ring-2 focus:ring-yellow-500/50" type="submit">Pivot within this topic</button>
-      </form>
-      <a href="/interview/" class="px-4 py-2 rounded text-sm font-semibold bg-white border hover:bg-gray-50">Let's talk about a different topic</a>
-    </div>
+    <form method="post" action="/interview/{{ interview.id }}/change-topic" id="pivotForm" class="hidden"></form>
+    
     {% if current_user.is_admin %}
     <div class="mt-2 flex items-center gap-4">
+      <span class="text-sm">Admin:</span>
       <label class="inline-flex items-center gap-2 text-sm">
         <input id="debugToggle" type="checkbox" {% if debug_enabled %}checked{% endif %}>
         <span>Debug: dump chat and responses</span>
@@ -118,6 +120,17 @@
                 body: JSON.stringify({ enabled: nt.checked })
               });
             } catch (_) {}
+          });
+        }
+      })();
+    </script>
+    <script>
+      (function () {
+        const pivotBtn = document.getElementById('pivotWithinTopicBtn');
+        const pivotForm = document.getElementById('pivotForm');
+        if (pivotBtn && pivotForm) {
+          pivotBtn.addEventListener('click', function () {
+            try { pivotForm.submit(); } catch (_) {}
           });
         }
       })();
@@ -361,8 +374,12 @@
           return pool.sort((a,b) => score(b) - score(a))[0] || voices[0] || null;
         }
 
+        let voicesAreLoaded = false;
+        let pendingSpeakOnVoicesReady = false;
+
         function populateVoices() {
           const voices = window.speechSynthesis.getVoices();
+          voicesAreLoaded = voices.length > 0;
           ttsVoiceSelect.innerHTML = '';
           if (!voices.length) {
             const opt = document.createElement('option');
@@ -419,8 +436,26 @@
         // Populate voices (may be async on some browsers)
         populateVoices();
         if (typeof window.speechSynthesis.onvoiceschanged !== 'undefined') {
-          window.speechSynthesis.onvoiceschanged = populateVoices;
+          window.speechSynthesis.onvoiceschanged = function () {
+            populateVoices();
+            if (ttsToggle.checked && pendingSpeakOnVoicesReady) {
+              const text = getLastAssistantText();
+              if (text) speak(text);
+              pendingSpeakOnVoicesReady = false;
+            }
+          };
         }
+        // Fallback in case onvoiceschanged does not fire
+        setTimeout(function () {
+          if (!voicesAreLoaded) {
+            populateVoices();
+            if (ttsToggle.checked && pendingSpeakOnVoicesReady && voicesAreLoaded) {
+              const text = getLastAssistantText();
+              if (text) speak(text);
+              pendingSpeakOnVoicesReady = false;
+            }
+          }
+        }, 300);
 
         ttsVoiceSelect.addEventListener('change', () => {
           const uri = ttsVoiceSelect.value;
@@ -428,10 +463,16 @@
           else localStorage.removeItem(VOICE_KEY);
         });
 
-        // If enabled on load, speak the latest assistant message
+        // If enabled on load, speak the latest assistant message, but wait for voices if needed
         if (ttsToggle.checked) {
           const text = getLastAssistantText();
-          if (text) speak(text);
+          if (text) {
+            if (window.speechSynthesis.getVoices().length) {
+              speak(text);
+            } else {
+              pendingSpeakOnVoicesReady = true;
+            }
+          }
         }
 
         ttsToggle.addEventListener('change', () => {
@@ -447,6 +488,31 @@
         ttsStop.addEventListener('click', () => {
           try { window.speechSynthesis.cancel(); } catch (_) {}
           ttsStatus.textContent = '';
+        });
+      })();
+    </script>
+    <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2" aria-label="Page scroll controls">
+      <button id="scrollUpBtn" type="button" class="p-2 rounded-full border border-yellow-300 bg-yellow-100/50 text-black shadow hover:bg-yellow-100/70 focus:outline-none focus:ring-2 focus:ring-yellow-500/50" title="Scroll to top" aria-label="Scroll to top">▲</button>
+      <button id="scrollDownBtn" type="button" class="p-2 rounded-full border border-yellow-300 bg-yellow-100/50 text-black shadow hover:bg-yellow-100/70 focus:outline-none focus:ring-2 focus:ring-yellow-500/50" title="Scroll to bottom" aria-label="Scroll to bottom">▼</button>
+    </div>
+    <script>
+      (function () {
+        const up = document.getElementById('scrollUpBtn');
+        const down = document.getElementById('scrollDownBtn');
+        if (!up || !down) return;
+        const bottom = document.getElementById('end-of-interview-page');
+        up.addEventListener('click', function () {
+          try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) { window.scrollTo(0, 0); }
+        });
+        down.addEventListener('click', function () {
+          if (bottom && bottom.scrollIntoView) {
+            bottom.scrollIntoView({ behavior: 'smooth', block: 'end' });
+          } else {
+            try {
+              const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+              window.scrollTo({ top: h, behavior: 'smooth' });
+            } catch (_) { window.scrollTo(0, document.body.scrollHeight || document.documentElement.scrollHeight || 0); }
+          }
         });
       })();
     </script>
