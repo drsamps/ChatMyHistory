@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Summary · {{ interview.title }} · Chat My History{% endblock %}
+{% block content %}
+  <style>
+    .summary-shell h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 0.5rem; }
+    .summary-shell h2 { font-size: 1.4rem; font-weight: 800; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+    .summary-shell h3 { font-size: 1.15rem; font-weight: 700; margin-top: 1rem; margin-bottom: 0.25rem; }
+    .summary-shell p { line-height: 1.75; margin: 0.5rem 0; }
+    .summary-shell ul { margin-left: 1.25rem; list-style: disc; }
+    .summary-shell blockquote { border-left: 4px solid #fde68a; padding-left: 0.75rem; color: #4b5563; background: #fffbeb; }
+    .summary-shell .standout { font-style: italic; background: #fff7ed; padding: 0 .15rem; border-radius: .15rem; }
+    /* Emojis are now appended in content from the LLM; we don't inject them via CSS. */
+  </style>
+  <div class="sticky top-0 z-40 bg-gray-50/95 supports-[backdrop-filter]:bg-gray-50/80 backdrop-blur border-b py-2 mb-3 flex items-center justify-between gap-2">
+    <h1 class="text-xl leading-tight font-extrabold tracking-tight">Summary — {{ interview.title }}</h1>
+    <div class="flex items-center gap-2">
+      <a href="/interview/{{ interview.id }}" class="px-3 py-2 border rounded text-sm bg-white">Back to Interview</a>
+      <a href="/interview/{{ interview.id }}/export/markdown" class="px-3 py-2 border rounded text-sm bg-white">Export Markdown</a>
+      <a href="/interview/{{ interview.id }}/export/pdf" class="px-3 py-2 border rounded text-sm bg-white">Export PDF</a>
+      <form method="post" action="/interview/{{ interview.id }}/summarize">
+        <button class="px-3 py-2 bg-black text-white rounded text-sm" type="submit">Refresh Summary</button>
+      </form>
+    </div>
+  </div>
+  <article class="summary-shell bg-white border rounded p-4">
+    {% if summary.format == 'html' %}
+      {{ summary.content | safe }}
+    {% else %}
+      <pre class="whitespace-pre-wrap">{{ summary.content }}</pre>
+    {% endif %}
+  </article>
+{% endblock %}
+
+

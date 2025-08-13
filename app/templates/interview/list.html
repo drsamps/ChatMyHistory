@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Topics · Chat My History{% endblock %}
+{% block content %}
+  <h1 class="text-2xl font-bold mt-8 mb-4">Your Interview Topics</h1>
+  <form method="post" action="/interview/" class="mb-4">
+    <div class="flex gap-2">
+      <input name="title" placeholder="Topic title" class="border rounded p-2 flex-1">
+      <button class="px-4 py-2 bg-black text-white rounded" type="submit">New Topic</button>
+    </div>
+  </form>
+  <h2 class="text-lg font-semibold mt-6 mb-2">Your recorded topics</h2>
+  <ul class="space-y-2">
+    {% for i in interviews %}
+      <li class="border rounded p-3 bg-white">
+        <a class="underline" href="/interview/{{ i.id }}">{{ i.title }}</a>
+      </li>
+    {% else %}
+      <li class="text-gray-600">No topics yet. Create your first one above.</li>
+    {% endfor %}
+  </ul>
+  {% if suggestions %}
+    <h2 class="text-lg font-semibold mt-6 mb-2">Suggested topics to consider</h2>
+    <div class="flex flex-wrap gap-2">
+      {% for s in suggestions %}
+        <form method="post" action="/interview/">
+          <input type="hidden" name="title" value="{{ s }}">
+          <button class="px-3 py-1 border rounded bg-white text-sm hover:bg-gray-50" type="submit">+ {{ s }}</button>
+        </form>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}

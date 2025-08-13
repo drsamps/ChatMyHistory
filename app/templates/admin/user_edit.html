@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Edit User · Admin{% endblock %}
+{% block content %}
+  <h1 class="text-2xl font-bold mt-8 mb-4">Edit User</h1>
+  <form method="post" action="/admin/users/{{ user.id }}/edit" class="bg-white p-6 border rounded grid gap-4 max-w-md">
+    <label>
+      <span class="block mb-1">Name</span>
+      <input type="text" name="name" value="{{ user.name }}" required class="w-full border rounded p-2">
+    </label>
+    <label>
+      <span class="block mb-1">Email</span>
+      <input type="email" name="email" value="{{ user.email }}" required class="w-full border rounded p-2">
+    </label>
+    <label class="inline-flex items-center gap-2">
+      <input type="checkbox" name="is_admin" {% if user.is_admin %}checked{% endif %}>
+      <span>Admin</span>
+    </label>
+    <label class="inline-flex items-center gap-2">
+      <input type="checkbox" name="reset_password">
+      <span>Require password reset on next login</span>
+    </label>
+    {% if not user.password_hash %}
+      <p class="text-sm text-orange-700">This account currently has no password set.</p>
+    {% endif %}
+    <div class="flex gap-2">
+      <a href="/admin/" class="px-3 py-2 border rounded">Cancel</a>
+      <button class="px-3 py-2 bg-black text-white rounded" type="submit">Save Changes</button>
+    </div>
+  </form>
+{% endblock %}
+
+

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Login · Chat My History{% endblock %}
+{% block content %}
+  <h1 class="text-2xl font-bold mt-8 mb-4">Login</h1>
+  <form method="post" action="/login" class="bg-white p-6 border rounded grid gap-4 max-w-md">
+    <label>
+      <span class="block mb-1">Email</span>
+      <input type="email" name="email" required class="w-full border rounded p-2">
+    </label>
+    <label>
+      <span class="block mb-1">Password</span>
+      <div class="relative">
+        <input id="loginPassword" type="password" name="password" required class="w-full border rounded p-2 pr-12">
+        <button id="toggleLoginPassword" type="button" class="p-1 text-gray-600" style="position: absolute; top: 50%; right: .5rem; transform: translateY(-50%);">👁️</button>
+      </div>
+    </label>
+    <button class="px-4 py-2 bg-black text-white rounded" type="submit">Login</button>
+  </form>
+  <script>
+    (function () {
+      const input = document.getElementById('loginPassword');
+      const btn = document.getElementById('toggleLoginPassword');
+      if (!input || !btn) return;
+      btn.addEventListener('click', function () {
+        const isPassword = input.type === 'password';
+        input.type = isPassword ? 'text' : 'password';
+        btn.textContent = isPassword ? '🙈' : '👁️';
+      });
+    })();
+  </script>
+  <p class="mt-3"><a class="underline" href="/register">Create an account</a></p>
+{% endblock %}

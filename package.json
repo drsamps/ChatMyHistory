@@ -1,0 +1,17 @@
+{
+  "name": "chatmyhistory",
+  "version": "1.0.0",
+  "description": "A Flask web app that guides seniors through voice/text interviews to capture a rich personal history, with admin controls, LLM integrations, and export-ready structure.",
+  "main": "tailwind.config.js",
+  "scripts": {
+    "build:css": "node node_modules/tailwindcss/lib/cli.js -i ./static/css/input.css -o ./static/css/output.css",
+    "watch:css": "node node_modules/tailwindcss/lib/cli.js -i ./static/css/input.css -o ./static/css/output.css --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "tailwindcss": "^3.4.10"
+  }
+}

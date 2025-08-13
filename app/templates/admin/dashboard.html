@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Admin · Chat My History{% endblock %}
+{% block content %}
+  <h1 class="text-2xl font-bold mt-8 mb-4">Admin Dashboard</h1>
+
+  <section class="grid md:grid-cols-2 gap-6">
+    <div class="bg-white border rounded p-4">
+      <h2 class="font-semibold mb-3">Users</h2>
+      <form method="post" action="/admin/users" class="grid gap-2 mb-4">
+        <input name="name" placeholder="Name" class="border rounded p-2" required>
+        <input name="email" placeholder="Email" type="email" class="border rounded p-2" required>
+        <div class="relative" style="position: relative;">
+          <input id="adminPassword" name="password" placeholder="Password" type="password" class="border rounded p-2 w-full pr-12" required>
+          <button id="toggleAdminPassword" type="button" class="p-1 text-gray-600" style="position: absolute; top: 50%; right: .5rem; transform: translateY(-50%);">👁️</button>
+        </div>
+        <label class="inline-flex items-center gap-2"><input type="checkbox" name="is_admin"> <span>Admin</span></label>
+        <button class="px-3 py-2 bg-black text-white rounded" type="submit">Create User</button>
+      </form>
+      <ul class="space-y-2">
+        {% for u in users %}
+          <li class="flex items-center justify-between border rounded p-2">
+            <div>
+              <div class="font-medium">{{ u.name }} {% if u.is_admin %}<span class="text-xs px-2 py-1 border rounded">admin</span>{% endif %}</div>
+              <div class="text-sm text-gray-600">{{ u.email }}</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <a class="px-2 py-1 border rounded" href="/admin/users/{{ u.id }}/edit">Edit</a>
+              {% if not u.password_hash %}
+                <span class="text-xs px-2 py-1 border rounded bg-yellow-50 text-yellow-800">no password</span>
+              {% endif %}
+              <form method="post" action="/admin/users/{{ u.id }}/delete">
+                <button class="px-2 py-1 border rounded" type="submit">Delete</button>
+              </form>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="bg-white border rounded p-4">
+      <h2 class="font-semibold mb-3">LLM Prompts</h2>
+      <form method="post" action="/admin/prompts" class="grid gap-2 mb-4">
+        <input name="name" placeholder="Name" class="border rounded p-2" required>
+        <textarea name="content" placeholder="Prompt content" class="border rounded p-2" rows="6" required></textarea>
+        <button class="px-3 py-2 bg-black text-white rounded" type="submit">Save Prompt</button>
+      </form>
+      <ul class="space-y-2">
+        {% for p in prompts %}
+          <li class="flex items-start justify-between border rounded p-2">
+            <div>
+              <div class="font-medium">{{ p.name }}</div>
+              <pre class="text-sm whitespace-pre-wrap">{{ p.content }}</pre>
+            </div>
+            <form method="post" action="/admin/prompts/{{ p.id }}/delete">
+              <button class="px-2 py-1 border rounded" type="submit">Delete</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+  <script>
+    (function () {
+      const input = document.getElementById('adminPassword');
+      const btn = document.getElementById('toggleAdminPassword');
+      if (!input || !btn) return;
+      btn.addEventListener('click', function () {
+        const isPassword = input.type === 'password';
+        input.type = isPassword ? 'text' : 'password';
+        btn.textContent = isPassword ? '🙈' : '👁️';
+      });
+    })();
+  </script>
+{% endblock %}

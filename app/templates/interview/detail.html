@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+{% block title %}Interview · Chat My History{% endblock %}
+{% block content %}
+  <div class="sticky top-0 z-40 bg-gray-50/95 supports-[backdrop-filter]:bg-gray-50/80 backdrop-blur border-b py-2 mb-3 flex items-center justify-between gap-2">
+    <div class="flex items-center gap-2">
+      <h1 id="topicTitleDisplay" class="text-xl leading-tight font-extrabold tracking-tight">{{ interview.title }}</h1>
+      <button id="editTitleBtn" type="button" class="text-sm px-2 py-1 border rounded bg-white hover:bg-gray-50" aria-label="Edit topic title">✏️ Edit</button>
+      <form id="editTitleForm" method="post" action="/interview/{{ interview.id }}/rename" class="hidden items-center gap-2">
+        <input id="editTitleInput" name="title" value="{{ interview.title }}" class="border rounded p-1 text-sm min-w-[16rem]" aria-label="Topic title">
+        <button class="px-2 py-1 bg-black text-white rounded text-sm" type="submit">Save</button>
+        <button id="cancelTitleBtn" class="px-2 py-1 border rounded text-sm bg-white" type="button">Cancel</button>
+      </form>
+    </div>
+    <div class="flex items-center gap-2">
+      {% if summary %}
+        <a href="/interview/{{ interview.id }}/summary" class="px-3 py-2 border rounded text-sm bg-white">View Summary</a>
+      {% endif %}
+      <form method="post" action="/interview/{{ interview.id }}/summarize">
+        <button class="px-3 py-2 bg-black text-white rounded text-sm" type="submit">Generate/Refresh Summary</button>
+      </form>
+    </div>
+  </div>
+  <div class="grid gap-3">
+    <div class="space-y-3">
+      {% for m in messages %}
+        <div class="p-3 rounded border bg-white" data-role="{{ m.role }}" data-message-id="{{ m.id }}">
+          <div class="text-xs text-gray-500 mb-1">{{ m.role|capitalize }}</div>
+          <div class="whitespace-pre-wrap leading-relaxed">{{ m.content }}</div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <form method="post" action="/interview/{{ interview.id }}/send" class="mt-2 grid gap-2">
+      <label class="block">
+        <span class="sr-only">Your message</span>
+        <textarea id="messageInput" name="content" rows="4" class="w-full border rounded p-3 text-lg" placeholder="Speak your story or type here…"></textarea>
+      </label>
+      <div class="flex items-center gap-3">
+        <button id="micButton" type="button" class="px-4 py-2 border rounded text-sm" aria-pressed="false" aria-label="Start voice input">🎤 Start dictation</button>
+        <span id="micStatus" class="text-sm text-gray-500"></span>
+      </div>
+      <div class="flex items-center gap-3">
+        <label class="inline-flex items-center gap-2 text-sm">
+          <input id="ttsToggle" type="checkbox" class="h-4 w-4">
+          <span>Speak interview questions</span>
+        </label>
+        <button id="ttsStop" type="button" class="px-2 py-1 border rounded text-xs">Stop</button>
+        <span id="ttsStatus" class="text-sm text-gray-500"></span>
+      </div>
+      <div class="flex items-center gap-3">
+        <label class="text-sm flex items-center gap-2">
+          <span>Voice</span>
+          <select id="ttsVoice" class="border rounded p-1 text-sm min-w-[12rem]"></select>
+        </label>
+      </div>
+      <button class="px-5 py-3 bg-black text-white rounded text-lg self-start" type="submit">Send</button>
+    </form>
+    <div class="mt-2 flex gap-2">
+      <form method="post" action="/interview/{{ interview.id }}/change-topic">
+        <button class="px-4 py-2 rounded text-sm font-semibold bg-yellow-400 hover:bg-yellow-500 text-black border border-yellow-500 shadow focus:outline-none focus:ring-2 focus:ring-yellow-500/50" type="submit">Pivot within this topic</button>
+      </form>
+      <a href="/interview/" class="px-4 py-2 rounded text-sm font-semibold bg-white border hover:bg-gray-50">Let's talk about a different topic</a>
+    </div>
+    <div id="end-of-interview-page" aria-hidden="true"></div>
+    <script>
+      (function () {
+        const display = document.getElementById('topicTitleDisplay');
+        const editBtn = document.getElementById('editTitleBtn');
+        const form = document.getElementById('editTitleForm');
+        const input = document.getElementById('editTitleInput');
+        const cancel = document.getElementById('cancelTitleBtn');
+        if (!display || !editBtn || !form || !input || !cancel) return;
+        function openEdit() {
+          form.classList.remove('hidden');
+          display.classList.add('hidden');
+          editBtn.classList.add('hidden');
+          input.focus();
+          input.select();
+        }
+        function closeEdit() {
+          form.classList.add('hidden');
+          display.classList.remove('hidden');
+          editBtn.classList.remove('hidden');
+          input.value = display.textContent || '';
+        }
+        editBtn.addEventListener('click', openEdit);
+        cancel.addEventListener('click', closeEdit);
+      })();
+    </script>
+    <script>
+      (function () {
+        const messageInput = document.getElementById('messageInput');
+        const micButton = document.getElementById('micButton');
+        const micStatus = document.getElementById('micStatus');
+
+        if (!messageInput || !micButton || !micStatus) return;
+
+        const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!Recognition) {
+          micButton.disabled = true;
+          micButton.classList.add('opacity-50', 'cursor-not-allowed');
+          micStatus.textContent = 'Voice input not supported in this browser.';
+          return;
+        }
+
+        let isListening = false;
+        const recognition = new Recognition();
+        recognition.lang = navigator.language || 'en-US';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        let interimTranscript = '';
+
+        recognition.onstart = function () {
+          isListening = true;
+          micButton.setAttribute('aria-pressed', 'true');
+          micButton.textContent = '⏹️ Stop dictation';
+          micButton.classList.add('bg-black', 'text-white', 'border-black');
+          micStatus.textContent = 'Listening…';
+        };
+
+        recognition.onerror = function (event) {
+          micStatus.textContent = 'Voice input error: ' + (event.error || 'unknown');
+        };
+
+        recognition.onend = function () {
+          micButton.setAttribute('aria-pressed', 'false');
+          micButton.textContent = '🎤 Start dictation';
+          micButton.classList.remove('bg-black', 'text-white', 'border-black');
+          micStatus.textContent = '';
+          if (isListening) {
+            // Auto-restart if we expected to keep listening
+            try { recognition.start(); } catch (_) {}
+          }
+        };
+
+        recognition.onresult = function (event) {
+          let finalChunk = '';
+          interimTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const result = event.results[i];
+            const transcript = result[0].transcript;
+            if (result.isFinal) {
+              finalChunk += transcript;
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+          if (finalChunk) {
+            const needsSpace = messageInput.value && !/\s$/.test(messageInput.value);
+            messageInput.value += (needsSpace ? ' ' : '') + finalChunk.trim();
+          }
+          // Optional: show interim text as placeholder status
+          micStatus.textContent = interimTranscript ? 'Listening… ' + interimTranscript : (isListening ? 'Listening…' : '');
+        };
+
+        micButton.addEventListener('click', function () {
+          if (!isListening) {
+            isListening = true;
+            try { recognition.start(); } catch (_) { /* already started */ }
+          } else {
+            isListening = false;
+            try { recognition.stop(); } catch (_) {}
+          }
+        });
+      })();
+    </script>
+    <script>
+      (function () {
+        const bottom = document.getElementById('end-of-interview-page');
+        if (!bottom) return;
+        try { if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } } catch (_) {}
+        // Defer until layout is complete
+        requestAnimationFrame(() => {
+          bottom.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        });
+      })();
+    </script>
+    <script>
+      (function () {
+        const ttsToggle = document.getElementById('ttsToggle');
+        const ttsStop = document.getElementById('ttsStop');
+        const ttsStatus = document.getElementById('ttsStatus');
+        const ttsVoiceSelect = document.getElementById('ttsVoice');
+        const KEY = 'cmh_speak_questions';
+        const VOICE_KEY = 'cmh_tts_voice';
+
+        if (!ttsToggle || !ttsStop || !ttsStatus || !ttsVoiceSelect) return;
+
+        const supportsTts = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+        if (!supportsTts) {
+          ttsToggle.disabled = true;
+          ttsToggle.classList.add('opacity-50', 'cursor-not-allowed');
+          ttsStatus.textContent = 'Text-to-speech not supported in this browser.';
+          ttsVoiceSelect.disabled = true;
+          return;
+        }
+
+        function getSelectedVoice() {
+          const desired = localStorage.getItem(VOICE_KEY);
+          const voices = window.speechSynthesis.getVoices();
+          if (!voices.length) return null;
+          if (desired) {
+            const matchByUri = voices.find(v => v.voiceURI === desired);
+            if (matchByUri) return matchByUri;
+            const matchByName = voices.find(v => v.name === desired);
+            if (matchByName) return matchByName;
+          }
+          return pickBestVoice(voices);
+        }
+
+        function pickBestVoice(voices) {
+          const lang = (navigator.language || 'en-US').toLowerCase();
+          const byLang = voices.filter(v => (v.lang || '').toLowerCase().startsWith(lang.split('-')[0]));
+          const pool = byLang.length ? byLang : voices;
+          const score = (v) => {
+            const name = (v.name + ' ' + v.voiceURI).toLowerCase();
+            let s = 0;
+            if (name.includes('google')) s += 5;
+            if (name.includes('microsoft')) s += 4;
+            if (name.includes('natural') || name.includes('neural')) s += 6;
+            if (name.includes('en-us')) s += 3;
+            if (v.localService) s += 1; // tends to be lower-latency
+            return s;
+          };
+          return pool.sort((a,b) => score(b) - score(a))[0] || voices[0] || null;
+        }
+
+        function populateVoices() {
+          const voices = window.speechSynthesis.getVoices();
+          ttsVoiceSelect.innerHTML = '';
+          if (!voices.length) {
+            const opt = document.createElement('option');
+            opt.textContent = 'Default system voice';
+            opt.value = '';
+            ttsVoiceSelect.appendChild(opt);
+            return;
+          }
+          const best = pickBestVoice(voices);
+          const saved = localStorage.getItem(VOICE_KEY);
+          voices
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .forEach(v => {
+              const opt = document.createElement('option');
+              opt.value = v.voiceURI;
+              opt.textContent = `${v.name} (${v.lang})${v.localService ? '' : ' • online'}`;
+              if ((saved && v.voiceURI === saved) || (!saved && best && v.voiceURI === best.voiceURI)) {
+                opt.selected = true;
+              }
+              ttsVoiceSelect.appendChild(opt);
+            });
+        }
+
+        function speak(text) {
+          try { window.speechSynthesis.cancel(); } catch (_) {}
+          if (!text) return;
+          const utter = new window.SpeechSynthesisUtterance(text);
+          const voice = getSelectedVoice();
+          if (voice) {
+            utter.voice = voice;
+            utter.lang = voice.lang || (navigator.language || 'en-US');
+          } else {
+            utter.lang = navigator.language || 'en-US';
+          }
+          // Slightly slower and neutral pitch tends to sound more natural for many voices
+          utter.rate = 0.95;
+          utter.pitch = 1.0;
+          utter.onstart = () => { ttsStatus.textContent = 'Speaking…'; };
+          utter.onend = () => { ttsStatus.textContent = ''; };
+          window.speechSynthesis.speak(utter);
+        }
+
+        function getLastAssistantText() {
+          const nodes = document.querySelectorAll('[data-role="assistant"] .whitespace-pre-wrap');
+          if (!nodes.length) return '';
+          return nodes[nodes.length - 1].textContent || '';
+        }
+
+        // Initialize toggle from storage
+        const saved = localStorage.getItem(KEY);
+        ttsToggle.checked = saved === '1';
+
+        // Populate voices (may be async on some browsers)
+        populateVoices();
+        if (typeof window.speechSynthesis.onvoiceschanged !== 'undefined') {
+          window.speechSynthesis.onvoiceschanged = populateVoices;
+        }
+
+        ttsVoiceSelect.addEventListener('change', () => {
+          const uri = ttsVoiceSelect.value;
+          if (uri) localStorage.setItem(VOICE_KEY, uri);
+          else localStorage.removeItem(VOICE_KEY);
+        });
+
+        // If enabled on load, speak the latest assistant message
+        if (ttsToggle.checked) {
+          const text = getLastAssistantText();
+          if (text) speak(text);
+        }
+
+        ttsToggle.addEventListener('change', () => {
+          localStorage.setItem(KEY, ttsToggle.checked ? '1' : '0');
+          if (ttsToggle.checked) {
+            const text = getLastAssistantText();
+            if (text) speak(text);
+          } else {
+            try { window.speechSynthesis.cancel(); } catch (_) {}
+          }
+        });
+
+        ttsStop.addEventListener('click', () => {
+          try { window.speechSynthesis.cancel(); } catch (_) {}
+          ttsStatus.textContent = '';
+        });
+      })();
+    </script>
+  </div>
+{% endblock %}
