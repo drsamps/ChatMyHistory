@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Styles · Chat My History{% endblock %}
+{% block content %}
+  <div class="flex items-center justify-between mt-8 mb-4">
+    <h1 class="text-2xl font-bold">Styles</h1>
+    {% if current_user.is_admin %}
+      <form method="post" action="/admin/styles/seed">
+        <button class="px-3 py-2 border rounded bg-white" title="Sync from ses_specs/comm_styles.yaml">Sync from YAML</button>
+      </form>
+    {% endif %}
+  </div>
+
+  <div class="grid lg:grid-cols-2 gap-6">
+    <section class="bg-white border rounded p-4">
+      <h2 class="font-semibold mb-3">{% if editing_persona %}Edit this Persona{% else %}Create a Persona{% endif %}</h2>
+      <form method="post" action="{% if editing_persona %}/styles/personas/{{ editing_persona.id }}/edit{% else %}/styles/personas{% endif %}" class="grid gap-2 mb-4">
+        <div class="grid sm:grid-cols-2 gap-2">
+          <input name="name" class="border rounded p-2" placeholder="Persona name" required value="{% if editing_persona %}{{ editing_persona.name }}{% endif %}">
+          <input name="description" class="border rounded p-2" placeholder="Short description (optional)" value="{% if editing_persona %}{{ editing_persona.description or '' }}{% endif %}">
+        </div>
+        <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="is_default" {% if editing_persona and editing_persona.is_default %}checked{% endif %}> <span>Make default for my interviews</span></label>
+        <div id="stylesPicker">
+          <div class="flex items-center justify-between mb-1">
+            <div class="font-semibold">Include communication styles</div>
+            <label class="inline-flex items-center gap-2 text-sm">
+              <input id="toggleDescs" type="checkbox" checked>
+              <span>show/hide descriptions</span>
+            </label>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-2 max-h-64 overflow-auto border rounded p-2">
+            {% for s in comm_styles %}
+              <label class="inline-flex items-start gap-2 p-1 rounded hover:bg-gray-50">
+                <input type="checkbox" name="style_ids" value="{{ s.id }}" {% if selected_style_ids and s.id in selected_style_ids %}checked{% endif %}>
+                <span>
+                  <div class="font-medium">{{ s.style_name }}</div>
+                  <div class="text-xs text-gray-500 style-desc">{{ s.prompt[:120] }}{% if s.prompt|length > 120 %}…{% endif %}</div>
+                </span>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="px-3 py-2 bg-black text-white rounded self-start">Save Persona</button>
+          {% if editing_persona %}
+            <a href="{{ url_for('styles.styles_home') }}" class="px-3 py-2 border rounded bg-white self-start">Cancel</a>
+          {% endif %}
+        </div>
+      </form>
+    </section>
+
+    <section class="bg-white border rounded p-4">
+      <h2 class="font-semibold mb-3">My Personas</h2>
+      <div class="grid gap-2">
+        {% if my_personas %}
+          {% for p in my_personas %}
+            <div class="p-2 border rounded flex items-center justify-between">
+              <div>
+                <div class="font-medium">{{ p.name }} {% if p.is_default %}<span class="text-xs text-green-700">· Default</span>{% endif %}</div>
+                <div class="text-sm text-gray-600">{{ p.description }}</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <a href="{{ url_for('styles.styles_home') }}?edit={{ p.id }}" class="px-2 py-1 border rounded text-sm bg-white">Edit</a>
+                <form method="post" action="/styles/personas/{{ p.id }}/default">
+                  <button class="px-2 py-1 border rounded text-sm" type="submit">Make Default</button>
+                </form>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-sm text-gray-600">No personas yet. Create one on the left.</div>
+        {% endif %}
+      </div>
+      <h2 class="font-semibold mt-6 mb-3">System Personas</h2>
+      <div class="grid gap-2">
+        {% if system_personas %}
+          {% for p in system_personas %}
+            <div class="p-2 border rounded flex items-center justify-between">
+              <div>
+                <div class="font-medium">{{ p.name }} {% if p.is_default %}<span class="text-xs text-green-700">· Default</span>{% endif %}</div>
+                <div class="text-sm text-gray-600">{{ p.description }}</div>
+              </div>
+              <form method="post" action="/styles/personas/{{ p.id }}/default">
+                <button class="px-2 py-1 border rounded text-sm" type="submit">Use As Default</button>
+              </form>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-sm text-gray-600">No system personas defined.</div>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+  <script>
+    (function () {
+      const container = document.getElementById('stylesPicker');
+      if (!container) return;
+      const toggle = document.getElementById('toggleDescs');
+      const apply = () => {
+        const show = !!(toggle && toggle.checked);
+        container.querySelectorAll('.style-desc').forEach(el => {
+          if (show) el.classList.remove('hidden');
+          else el.classList.add('hidden');
+        });
+      };
+      if (toggle) {
+        toggle.addEventListener('change', apply);
+      }
+      apply();
+    })();
+  </script>
+{% endblock %}
+
+

@@ -30,6 +30,7 @@ def create_app() -> Flask:
     # Create tables if not exist (for initial bootstrapping)
     with app.app_context():
         from .models import user, interview, media, prompt, summary  # noqa: F401
+        from .models import persona  # registers CommStyle, Persona, PersonaStyle
         from .models.user import User
         db.create_all()
 
@@ -49,11 +50,13 @@ def create_app() -> Flask:
     from .blueprints.admin.routes import admin_bp
     from .blueprints.interview.routes import interview_bp
     from .blueprints.api.routes import api_bp
+    from .blueprints.styles.routes import styles_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(interview_bp, url_prefix="/interview")
     app.register_blueprint(api_bp, url_prefix="/api")
+    app.register_blueprint(styles_bp, url_prefix="/styles")
 
     # Root
     @app.get("/")

@@ -8,6 +8,14 @@
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
     .container { max-width: 960px; margin: 0 auto; padding: 1rem; }
+    /* Subtle pressed feedback for all buttons/links */
+    button, a {
+      transition: transform .05s ease, filter .05s ease;
+    }
+    button:active, a:active {
+      transform: translateY(1px);
+      filter: brightness(0.95);
+    }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
@@ -16,6 +24,7 @@
       <a href="/" class="text-xl font-bold">Chat My History{% if current_user.is_authenticated %}: {{ current_user.name }}{% endif %}</a>
       <div class="space-x-4">
         <a href="/interview/" class="underline">Interviews</a>
+        <a href="/styles" class="underline" title="Set communication styles of the AI interviewer">Styles</a>
         <a href="/admin/" class="underline">Admin</a>
         {% if current_user.is_authenticated %}
         <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
@@ -39,5 +48,65 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+  <script>
+    (function () {
+      // Disable submit button on form submit and show loading text
+      function computeLoadingText(original) {
+        if (!original) return 'Working…';
+        const key = original.trim().toLowerCase();
+        const map = {
+          'send': 'Sending…',
+          'save': 'Saving…',
+          'submit': 'Submitting…',
+          'login': 'Logging in…',
+          'logout': 'Logging out…',
+          'refresh summary': 'Refreshing…',
+          'generate/refresh summary': 'Generating…',
+          'new topic': 'Creating…',
+          'pivot within this topic': 'Pivoting…',
+          'export markdown': 'Exporting…',
+          'export pdf': 'Exporting…'
+        };
+        return map[key] || (original.endsWith('…') ? original : (original + '…'));
+      }
+
+      document.addEventListener('submit', function (e) {
+        try {
+          const form = e.target;
+          // Only for actual forms
+          if (!form || !(form instanceof HTMLFormElement)) return;
+          // Find the submitter if available
+          const btn = e.submitter && e.submitter instanceof HTMLElement ? e.submitter : form.querySelector('button[type="submit"], input[type="submit"]');
+          if (!btn || btn.dataset.loadingApplied === '1') return;
+          // Only adjust if it's a button-like element
+          const isButton = btn.tagName === 'BUTTON' || btn.tagName === 'INPUT';
+          if (!isButton) return;
+          const originalText = btn.textContent || btn.value || '';
+          const loadingText = computeLoadingText(originalText);
+          btn.dataset.originalText = originalText;
+          btn.dataset.loadingApplied = '1';
+          if (btn.tagName === 'BUTTON') {
+            btn.textContent = loadingText;
+          } else if (btn.tagName === 'INPUT') {
+            btn.value = loadingText;
+          }
+          // Visual disabled state
+          btn.setAttribute('disabled', 'true');
+          try { btn.classList.add('opacity-50', 'cursor-not-allowed', 'cursor-wait'); } catch (_) {}
+          try { btn.style.cursor = 'wait'; } catch (_) {}
+        } catch (_) {}
+      }, true);
+
+      // Brief pressed flash for all buttons on click (non-blocking)
+      document.addEventListener('click', function (e) {
+        const el = e.target;
+        if (!(el instanceof HTMLElement)) return;
+        const btn = el.closest('button, a');
+        if (!btn) return;
+        btn.classList.add('active');
+        setTimeout(() => btn && btn.classList && btn.classList.remove('active'), 120);
+      }, true);
+    })();
+  </script>
 </body>
 </html>

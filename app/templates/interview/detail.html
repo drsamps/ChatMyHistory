@@ -12,21 +12,44 @@
       </form>
     </div>
     <div class="flex items-center gap-2">
+      <label class="text-sm flex items-center gap-2">
+        <span>Persona</span>
+        <select id="personaSelect" class="border rounded p-1 text-sm min-w-[16rem]" title="Select an interviewer persona...">
+          <option value="">Select an interviewer persona...</option>
+          {% if personas and personas|length > 0 %}
+            {% for p in personas %}
+              <option value="{{ p.id }}" {% if selected_persona_id and p.id == selected_persona_id %}selected{% endif %}>{{ p.name }}{% if p.is_system %} (system){% endif %}</option>
+            {% endfor %}
+          {% else %}
+            <option disabled>(click Styles to define personalities)</option>
+          {% endif %}
+        </select>
+      </label>
       {% if summary %}
         <a href="/interview/{{ interview.id }}/summary" class="px-3 py-2 border rounded text-sm bg-white">View Summary</a>
       {% endif %}
-      <form method="post" action="/interview/{{ interview.id }}/summarize">
-        <button class="px-3 py-2 bg-black text-white rounded text-sm" type="submit">Generate/Refresh Summary</button>
+      <form id="summarizeForm" method="post" action="/interview/{{ interview.id }}/summarize">
+        <button id="summarizeBtn" class="px-3 py-2 bg-black text-white rounded text-sm hover:bg-gray-800 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-black/50 disabled:opacity-50 disabled:cursor-not-allowed" type="submit">Generate/Refresh Summary</button>
       </form>
     </div>
   </div>
   <div class="grid gap-3">
     <div class="space-y-3">
       {% for m in messages %}
-        <div class="p-3 rounded border bg-white" data-role="{{ m.role }}" data-message-id="{{ m.id }}">
-          <div class="text-xs text-gray-500 mb-1">{{ m.role|capitalize }}</div>
-          <div class="whitespace-pre-wrap leading-relaxed">{{ m.content }}</div>
-        </div>
+        {% if m.role != 'system' %}
+          <div class="p-3 rounded border bg-white" data-role="{{ m.role }}" data-message-id="{{ m.id }}">
+            <div class="text-xs text-gray-500 mb-1">
+              {% if m.role == 'user' %}
+                {{ current_user.name.split(' ')[0] if current_user and current_user.name else 'User' }}
+              {% elif m.role == 'assistant' %}
+                Interviewer
+              {% else %}
+                System
+              {% endif %}
+            </div>
+            <div class="whitespace-pre-wrap leading-relaxed">{{ m.content }}</div>
+          </div>
+        {% endif %}
       {% endfor %}
     </div>
 
@@ -36,7 +59,8 @@
         <textarea id="messageInput" name="content" rows="4" class="w-full border rounded p-3 text-lg" placeholder="Speak your story or type here…"></textarea>
       </label>
       <div class="flex items-center gap-3">
-        <button id="micButton" type="button" class="px-4 py-2 border rounded text-sm" aria-pressed="false" aria-label="Start voice input">🎤 Start dictation</button>
+        <button id="micButton" type="button" class="px-4 py-2 border rounded text-sm bg-green-100 text-green-900 border-green-300 hover:bg-green-200" aria-pressed="false" aria-label="Start voice input">🎤 Start Dictation</button>
+        <button id="micStopSend" type="button" class="px-4 py-2 rounded text-sm font-semibold bg-green-500 hover:bg-green-600 text-white border border-green-600 shadow hidden">Stop Dictation and Send to the Interviewer</button>
         <span id="micStatus" class="text-sm text-gray-500"></span>
       </div>
       <div class="flex items-center gap-3">
@@ -61,7 +85,68 @@
       </form>
       <a href="/interview/" class="px-4 py-2 rounded text-sm font-semibold bg-white border hover:bg-gray-50">Let's talk about a different topic</a>
     </div>
+    {% if current_user.is_admin %}
+    <div class="mt-2 flex items-center gap-4">
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input id="debugToggle" type="checkbox" {% if debug_enabled %}checked{% endif %}>
+        <span>Debug: dump chat and responses</span>
+      </label>
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input id="noThreadToggle" type="checkbox" {% if no_thread_enabled %}checked{% endif %}>
+        <span>Do not include conversation thread with system prompt</span>
+      </label>
+    </div>
+    <script>
+      (function () {
+        const dt = document.getElementById('debugToggle');
+        if (dt) {
+          dt.addEventListener('change', async function () {
+            try {
+              await fetch('/interview/{{ interview.id }}/debug-toggle', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+                body: JSON.stringify({ enabled: dt.checked })
+              });
+            } catch (_) {}
+          });
+        }
+        const nt = document.getElementById('noThreadToggle');
+        if (nt) {
+          nt.addEventListener('change', async function () {
+            try {
+              await fetch('/interview/{{ interview.id }}/no-thread-toggle', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+                body: JSON.stringify({ enabled: nt.checked })
+              });
+            } catch (_) {}
+          });
+        }
+      })();
+    </script>
+    {% endif %}
     <div id="end-of-interview-page" aria-hidden="true"></div>
+    <script>
+      (function () {
+        const sel = document.getElementById('personaSelect');
+        if (!sel) return;
+        sel.addEventListener('change', async function () {
+          const val = sel.value;
+          if (!val) return;
+          try {
+            // POST selection for this interview
+            await fetch('/interview/{{ interview.id }}/persona', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+              body: JSON.stringify({ persona_id: parseInt(val, 10) })
+            });
+            // Pulse green to acknowledge
+            sel.classList.add('bg-green-100');
+            setTimeout(() => sel.classList.remove('bg-green-100'), 500);
+          } catch (_) {
+            // no-op
+          }
+        });
+      })();
+    </script>
     <script>
       (function () {
         const display = document.getElementById('topicTitleDisplay');
@@ -91,7 +176,9 @@
       (function () {
         const messageInput = document.getElementById('messageInput');
         const micButton = document.getElementById('micButton');
+        const micStopSend = document.getElementById('micStopSend');
         const micStatus = document.getElementById('micStatus');
+        const formEl = micButton ? micButton.closest('form') : null;
 
         if (!messageInput || !micButton || !micStatus) return;
 
@@ -104,6 +191,8 @@
         }
 
         let isListening = false;
+        let shouldInsertPausePunctuation = false;
+        let shouldInsertStopPunctuation = false;
         const recognition = new Recognition();
         recognition.lang = navigator.language || 'en-US';
         recognition.continuous = true;
@@ -111,11 +200,26 @@
 
         let interimTranscript = '';
 
+        function appendPeriodIfNeeded() {
+          const original = messageInput.value;
+          const trimmed = original.replace(/\s+$/, '');
+          if (!trimmed) return;
+          const lastChar = trimmed.slice(-1);
+          const needsPeriod = '.!?…'.indexOf(lastChar) === -1;
+          if (needsPeriod) {
+            messageInput.value = trimmed + '. ';
+          } else if (original.length === trimmed.length) {
+            messageInput.value = original + ' ';
+          }
+        }
+
         recognition.onstart = function () {
           isListening = true;
           micButton.setAttribute('aria-pressed', 'true');
-          micButton.textContent = '⏹️ Stop dictation';
-          micButton.classList.add('bg-black', 'text-white', 'border-black');
+          micButton.textContent = '⏸️ Pause Dictation';
+          micButton.classList.remove('bg-green-100', 'text-green-900', 'border-green-300', 'hover:bg-green-200');
+          micButton.classList.add('bg-yellow-300', 'text-black', 'border-yellow-400', 'hover:bg-yellow-400');
+          if (micStopSend) micStopSend.classList.remove('hidden');
           micStatus.textContent = 'Listening…';
         };
 
@@ -125,9 +229,20 @@
 
         recognition.onend = function () {
           micButton.setAttribute('aria-pressed', 'false');
-          micButton.textContent = '🎤 Start dictation';
-          micButton.classList.remove('bg-black', 'text-white', 'border-black');
+          micButton.textContent = '🎤 Start Dictation';
+          micButton.classList.remove('bg-yellow-300', 'text-black', 'border-yellow-400', 'hover:bg-yellow-400');
+          micButton.classList.add('bg-green-100', 'text-green-900', 'border-green-300', 'hover:bg-green-200');
+          if (micStopSend) micStopSend.classList.add('hidden');
           micStatus.textContent = '';
+          if (shouldInsertPausePunctuation || shouldInsertStopPunctuation) {
+            appendPeriodIfNeeded();
+            if (shouldInsertStopPunctuation && formEl) {
+              // Submit after inserting punctuation when stop+send was requested
+              try { formEl.submit(); } catch (_) {}
+            }
+            shouldInsertPausePunctuation = false;
+            shouldInsertStopPunctuation = false;
+          }
           if (isListening) {
             // Auto-restart if we expected to keep listening
             try { recognition.start(); } catch (_) {}
@@ -160,9 +275,17 @@
             try { recognition.start(); } catch (_) { /* already started */ }
           } else {
             isListening = false;
+            shouldInsertPausePunctuation = true;
             try { recognition.stop(); } catch (_) {}
           }
         });
+        if (micStopSend) {
+          micStopSend.addEventListener('click', function () {
+            isListening = false;
+            shouldInsertStopPunctuation = true;
+            try { recognition.stop(); } catch (_) {}
+          });
+        }
       })();
     </script>
     <script>
@@ -173,6 +296,18 @@
         // Defer until layout is complete
         requestAnimationFrame(() => {
           bottom.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        });
+      })();
+    </script>
+    <script>
+      (function () {
+        const form = document.getElementById('summarizeForm');
+        const btn = document.getElementById('summarizeBtn');
+        if (!form || !btn) return;
+        form.addEventListener('submit', function () {
+          btn.disabled = true;
+          btn.textContent = 'Generating…';
+          btn.classList.add('cursor-wait');
         });
       })();
     </script>

@@ -12,6 +12,7 @@ class User(db.Model, UserMixin):
     name = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     password_hash = db.Column(db.String(255), nullable=True)
+    default_persona_id = db.Column(db.Integer, db.ForeignKey("personas.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     interviews = db.relationship("Interview", back_populates="user", lazy=True)

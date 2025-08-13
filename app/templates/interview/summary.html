@@ -17,8 +17,8 @@
       <a href="/interview/{{ interview.id }}" class="px-3 py-2 border rounded text-sm bg-white">Back to Interview</a>
       <a href="/interview/{{ interview.id }}/export/markdown" class="px-3 py-2 border rounded text-sm bg-white">Export Markdown</a>
       <a href="/interview/{{ interview.id }}/export/pdf" class="px-3 py-2 border rounded text-sm bg-white">Export PDF</a>
-      <form method="post" action="/interview/{{ interview.id }}/summarize">
-        <button class="px-3 py-2 bg-black text-white rounded text-sm" type="submit">Refresh Summary</button>
+      <form id="refreshSummaryForm" method="post" action="/interview/{{ interview.id }}/summarize">
+        <button id="refreshSummaryBtn" class="px-3 py-2 bg-black text-white rounded text-sm hover:bg-gray-800 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-black/50 disabled:opacity-50 disabled:cursor-not-allowed" type="submit">Refresh Summary</button>
       </form>
     </div>
   </div>
@@ -32,3 +32,15 @@
 {% endblock %}
 
 
+<script>
+  (function () {
+    const form = document.getElementById('refreshSummaryForm');
+    const btn = document.getElementById('refreshSummaryBtn');
+    if (!form || !btn) return;
+    form.addEventListener('submit', function () {
+      btn.disabled = true;
+      btn.textContent = 'Refreshing…';
+      btn.classList.add('cursor-wait');
+    });
+  })();
+</script>

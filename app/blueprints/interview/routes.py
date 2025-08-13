@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, send_file, make_response
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, send_file, make_response, session
 from flask_login import login_required, current_user
 from ...extensions import db
 from ...models.interview import Interview, Message
 from ...models.summary import Summary
 from ...services.llm import get_chat_response, summarize_transcript
+from ...models.persona import Persona
 import io
 
 
@@ -75,7 +76,55 @@ def view_interview(interview_id: int):
     messages = Message.query.filter_by(interview_id=interview.id).order_by(Message.created_at.asc()).all()
     # Try to load existing session summary (if any) for quick link/UI cue
     summary = Summary.query.filter_by(interview_id=interview.id, kind="session").first()
-    return render_template("interview/detail.html", interview=interview, messages=messages, summary=summary)
+    # Persona dropdown data
+    personas = (
+        Persona.query.filter((Persona.user_id == current_user.id) | (Persona.is_system == True))  # noqa: E712
+        .order_by(Persona.is_system.desc(), Persona.name.asc())
+        .all()
+    )
+    # Determine selected persona: per-interview selection overrides defaults
+    selected_persona_id = None
+    # Try session override first
+    sel_key = f"sel_persona_{interview.id}"
+    try:
+        sel_val = session.get(sel_key)
+        if sel_val:
+            sel_val_int = int(sel_val)
+            if any(p.id == sel_val_int for p in personas):
+                selected_persona_id = sel_val_int
+    except Exception:
+        selected_persona_id = None
+    # Fallback to default persona (user default then system default)
+    if not selected_persona_id:
+        for p in personas:
+            if (p.is_system and p.is_default) or (not p.is_system and p.user_id == current_user.id and p.is_default):
+                selected_persona_id = p.id
+                break
+
+    # Debug toggle from session (admin-only UI will control this)
+    debug_enabled = False
+    try:
+        debug_enabled = bool(session.get(f"debug_chat_{interview.id}"))
+    except Exception:
+        debug_enabled = False
+
+    # No-thread toggle from session (admin-only UI)
+    no_thread_enabled = False
+    try:
+        no_thread_enabled = session.get(f"no_thread_{interview.id}") == "1"
+    except Exception:
+        no_thread_enabled = False
+
+    return render_template(
+        "interview/detail.html",
+        interview=interview,
+        messages=messages,
+        summary=summary,
+        personas=personas,
+        selected_persona_id=selected_persona_id,
+        debug_enabled=debug_enabled,
+        no_thread_enabled=no_thread_enabled,
+    )
 
 
 @interview_bp.post("/<int:interview_id>/send")
@@ -142,6 +191,63 @@ def change_topic(interview_id: int):
     db.session.add(assistant_msg)
     db.session.commit()
 
+    return redirect(url_for("interview.view_interview", interview_id=interview.id))
+
+
+@interview_bp.post("/<int:interview_id>/persona")
+@login_required
+def set_interview_persona(interview_id: int):
+    interview = Interview.query.get_or_404(interview_id)
+    if interview.user_id != current_user.id and not current_user.is_admin:
+        return ("", 403)
+
+    pid_raw = request.form.get("persona_id") or request.json.get("persona_id") if request.is_json else None
+    try:
+        pid = int(pid_raw) if pid_raw is not None else None
+    except Exception:
+        pid = None
+    if not pid:
+        return ("", 400)
+
+    # Validate persona access
+    p = Persona.query.get(pid)
+    if not p or (not p.is_system and p.user_id != current_user.id):
+        return ("", 404)
+
+    session[f"sel_persona_{interview.id}"] = pid
+    # Return no content for XHR or redirect back if normal form post
+    if request.headers.get("X-Requested-With") == "fetch":
+        return ("", 204)
+    return redirect(url_for("interview.view_interview", interview_id=interview.id))
+
+
+@interview_bp.post("/<int:interview_id>/debug-toggle")
+@login_required
+def toggle_debug(interview_id: int):
+    interview = Interview.query.get_or_404(interview_id)
+    if not current_user.is_admin:
+        return ("", 403)
+    # Accept form or JSON
+    enabled_raw = request.form.get("enabled") or (request.json.get("enabled") if request.is_json else None)
+    enabled = str(enabled_raw).lower() in {"1", "true", "on", "yes"}
+    session[f"debug_chat_{interview.id}"] = "1" if enabled else "0"
+    # For fetch requests, send no content
+    if request.headers.get("X-Requested-With") == "fetch":
+        return ("", 204)
+    return redirect(url_for("interview.view_interview", interview_id=interview.id))
+
+
+@interview_bp.post("/<int:interview_id>/no-thread-toggle")
+@login_required
+def toggle_no_thread(interview_id: int):
+    interview = Interview.query.get_or_404(interview_id)
+    if not current_user.is_admin:
+        return ("", 403)
+    enabled_raw = request.form.get("enabled") or (request.json.get("enabled") if request.is_json else None)
+    enabled = str(enabled_raw).lower() in {"1", "true", "on", "yes"}
+    session[f"no_thread_{interview.id}"] = "1" if enabled else "0"
+    if request.headers.get("X-Requested-With") == "fetch":
+        return ("", 204)
     return redirect(url_for("interview.view_interview", interview_id=interview.id))
 
 
@@ -263,7 +369,10 @@ def export_summary_pdf(interview_id: int):
     try:
         from xhtml2pdf import pisa  # type: ignore
     except Exception:
-        flash("PDF export requires xhtml2pdf. Please install dependencies and retry.", "danger")
+        flash(
+            "Sorry, I cannot export a PDF right now. Please tell the administrator 'PDF export requires xhtml2pdf. Please install dependencies and retry.'",
+            "danger",
+        )
         return redirect(url_for("interview.view_summary", interview_id=interview_id))
 
     interview = Interview.query.get_or_404(interview_id)
