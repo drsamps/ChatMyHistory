@@ -1,5 +1,7 @@
 import os
 from flask import Flask, render_template
+from flask_login import current_user
+from datetime import datetime
 from dotenv import load_dotenv
 
 from .extensions import db, bcrypt, login_manager
@@ -17,6 +19,7 @@ def create_app() -> Flask:
     # Serve static from project-level ./static (aligns with Tailwind build path)
     app = Flask(__name__, static_folder="../static", template_folder="templates")
     app.config.from_object(Config())
+    # Default logging; debug can be enabled via FLASK_DEBUG env when needed
 
     # Ensure storage directories exist
     os.makedirs(app.config["UPLOAD_DIR"], exist_ok=True)
@@ -61,6 +64,44 @@ def create_app() -> Flask:
     # Root
     @app.get("/")
     def index():
-        return render_template("index.html")
+        # Provide a lightweight dashboard when authenticated
+        context = {}
+        try:
+            if current_user.is_authenticated:
+                from .models.interview import Interview, Message
+                from .models.summary import Summary
+                from .models.persona import Persona
+
+                interviews = (
+                    Interview.query.filter_by(user_id=current_user.id)
+                    .order_by(Interview.created_at.desc())
+                    .all()
+                )
+                # Compute simple message counts per interview id
+                msg_counts = {i.id: Message.query.filter_by(interview_id=i.id).count() for i in interviews}
+                # Summary presence per interview id
+                summary_ids = {s.interview_id for s in Summary.query.filter_by(user_id=current_user.id).all()}
+                # Personas overview
+                persona_count = Persona.query.filter_by(user_id=current_user.id).count()
+                default_persona = (
+                    Persona.query.filter_by(user_id=current_user.id, is_default=True).first()
+                    or Persona.query.filter_by(is_system=True, is_default=True).first()
+                )
+
+                context.update(
+                    total_interviews=len(interviews),
+                    interviews=interviews[:5],  # show a few recent on the home page
+                    msg_counts=msg_counts,
+                    summary_ids=summary_ids,
+                    persona_count=persona_count,
+                    default_persona=default_persona,
+                    summaries_count=Summary.query.filter_by(user_id=current_user.id).count(),
+                )
+        except Exception:
+            # If any dashboard query fails, render the page without dashboard data
+            context = {}
+        # Always include current year for footer
+        context.setdefault("current_year", datetime.utcnow().year)
+        return render_template("index.html", **context)
 
     return app

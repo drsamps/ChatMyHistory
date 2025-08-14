@@ -21,9 +21,15 @@ class User(db.Model, UserMixin):
         self.password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
 
     def check_password(self, password: str) -> bool:
-        if not self.password_hash:
+        # Treat None or whitespace-only hashes as not set
+        if not self.password_hash or (isinstance(self.password_hash, str) and self.password_hash.strip() == ""):
             return False
-        return bcrypt.check_password_hash(self.password_hash, password)
+        try:
+            return bcrypt.check_password_hash(self.password_hash, password)
+        except Exception:
+            # If the stored value is not a valid bcrypt hash, do not raise.
+            # Caller may handle plaintext migration.
+            return False
 
 
 @login_manager.user_loader

@@ -214,7 +214,9 @@ def edit_user_post(user_id: int):
     user.is_admin = is_admin
 
     if reset_password:
-        # Use empty string to support databases that may still have NOT NULL constraint
+        # Set password_hash to empty string to indicate no password is set
+        # This allows the user to be redirected to set-password on next login
+        # Both None and empty string will work with the login logic
         user.password_hash = ""
 
     db.session.commit()

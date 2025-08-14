@@ -19,15 +19,53 @@ def login_post():
     email = request.form.get("email", "").strip().lower()
     password = request.form.get("password", "")
     user = User.query.filter_by(email=email).first()
+    
+    if not user:
+        flash("Invalid credentials", "danger")
+        return redirect(url_for("auth.login"))
+    
+    stored = user.password_hash
+    is_blank = (not stored) or (isinstance(stored, str) and stored.strip() == "")
+    looks_like_bcrypt = isinstance(stored, str) and stored.startswith("$2") and len(stored) > 20
+    equals_plain = isinstance(stored, str) and stored == password
+    equals_plain_stripped = (
+        isinstance(stored, str)
+        and not looks_like_bcrypt
+        and isinstance(password, str)
+        and stored
+        and password
+        and stored.strip() == password.strip()
+    )
+
     # If user exists but has no password set, route to set-password
-    if user and not user.password_hash:
+    if is_blank:
         session["pending_password_user_id"] = user.id
         flash("Please set a new password to continue.", "info")
         return redirect(url_for("auth.set_password"))
-
-    if not user or not user.check_password(password):
+    
+    # Check if the stored password_hash is actually a plaintext password
+    # This handles migration from plaintext to hashed passwords
+    if isinstance(stored, str):
+        # Fast-path exact match
+        if equals_plain:
+            user.set_password(password)
+            db.session.commit()
+            flash("Your password has been automatically updated for security.", "info")
+            login_user(user)
+            return redirect(url_for("index"))
+        # If the stored value doesn't look like a bcrypt hash, try a lenient comparison
+        if not looks_like_bcrypt and equals_plain_stripped:
+            user.set_password(password)
+            db.session.commit()
+            flash("Your password has been automatically updated for security.", "info")
+            login_user(user)
+            return redirect(url_for("index"))
+    
+    # Normal password check
+    if not user.check_password(password):
         flash("Invalid credentials", "danger")
         return redirect(url_for("auth.login"))
+    
     login_user(user)
     return redirect(url_for("index"))
 

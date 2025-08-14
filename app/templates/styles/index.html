@@ -33,7 +33,16 @@
                 <input type="checkbox" name="style_ids" value="{{ s.id }}" {% if selected_style_ids and s.id in selected_style_ids %}checked{% endif %}>
                 <span>
                   <div class="font-medium">{{ s.style_name }}</div>
-                  <div class="text-xs text-gray-500 style-desc">{{ s.prompt[:120] }}{% if s.prompt|length > 120 %}…{% endif %}</div>
+                  {% set is_long = s.prompt|length > 120 %}
+                  <div class="text-xs text-gray-500 style-desc" id="desc-{{ s.id }}">
+                    {% if is_long %}
+                      <span class="short">{{ s.prompt[:120] }}</span><span class="ellipsis">…</span>
+                      <button type="button" class="more-link underline text-blue-700" data-target="desc-{{ s.id }}">more</button>
+                      <span class="full hidden">{{ s.prompt }}</span>
+                    {% else %}
+                      <span class="short">{{ s.prompt }}</span>
+                    {% endif %}
+                  </div>
                 </span>
               </label>
             {% endfor %}
@@ -106,6 +115,24 @@
         toggle.addEventListener('change', apply);
       }
       apply();
+
+      // Expand individual prompts when clicking "more"
+      container.querySelectorAll('.more-link').forEach(btn => {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = btn.getAttribute('data-target');
+          const wrap = id ? document.getElementById(id) : null;
+          if (!wrap) return;
+          const shortEl = wrap.querySelector('.short');
+          const ellipsisEl = wrap.querySelector('.ellipsis');
+          const fullEl = wrap.querySelector('.full');
+          if (shortEl) shortEl.classList.add('hidden');
+          if (ellipsisEl) ellipsisEl.classList.add('hidden');
+          btn.classList.add('hidden');
+          if (fullEl) fullEl.classList.remove('hidden');
+        });
+      });
     })();
   </script>
 {% endblock %}
